@@ -112,7 +112,8 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
     of parsed `.E` rows and `next_line_index` is the first unconsumed line.
     If no non-control parameter (a code that does not begin with
     `_CONTROL_PREFIX`) is found in the `.ER` header, continuation values are
-    skipped.
+    skipped. This treats malformed `.ER` headers as non-fatal and keeps
+    parsing subsequent records.
     """
     header = lines[start]
     _, _, payload = header.partition(" ")
@@ -249,7 +250,7 @@ def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
             rows.extend(_parse_dot_a_or_e(line, "A"))
             i += 1
         elif fmt == "E":
-            if line[:3].upper() == ".ER":
+            if len(line) >= 3 and line[0] == "." and line[1].upper() == "E" and line[2].upper() == "R":
                 e_rows, next_i = _parse_dot_er_block(normalized, i)
                 rows.extend(e_rows)
                 i = next_i
