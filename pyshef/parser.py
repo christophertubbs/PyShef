@@ -11,6 +11,8 @@ _CONTROL_PREFIX = "D"
 _FORMAT_RE = re.compile(r"^\.(A|B|E)[A-Z0-9]*\b")
 # Matches parameter code tokens with optional trailing values ("PPH 1.25", "TAH 72").
 _CODE_VALUE_RE = re.compile(r"^([A-Z][A-Z0-9]{1,7})(?:\s+(.+))?$")
+_E_CONTINUATION_RE = re.compile(r"^\.[Ee](\d+)\b")
+_TIMEZONE_RE = re.compile(r"^[A-Z]{1,3}$")
 
 
 @dataclass
@@ -38,8 +40,10 @@ def _extract_code_value(token: str) -> tuple[str | None, str | None]:
     return code, value
 
 
-def _is_e_continuation_line(line: str) -> bool:
-    return len(line) > 2 and line[0] == "." and line[1].upper() == "E" and line[2].isdigit()
+def _extract_timezone(parts: list[str], index: int) -> tuple[str | None, int]:
+    if len(parts) > index and _TIMEZONE_RE.fullmatch(parts[index]):
+        return parts[index], index + 1
+    return None, index
 
 
 def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
@@ -53,11 +57,8 @@ def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
     parts = payload.strip().split()
     station = parts[0] if parts else None
     date_token = parts[1] if len(parts) > 1 else None
-    timezone = None
     data_start = 2
-    if len(parts) > 2 and "/" not in parts[2]:
-        timezone = parts[2]
-        data_start = 3
+    timezone, data_start = _extract_timezone(parts, data_start)
     data = " ".join(parts[data_start:])
     tokens = _split_slash_tokens(data)
 
@@ -111,8 +112,8 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
     parts = payload.strip().split()
     station = parts[0] if parts else None
     date_token = parts[1] if len(parts) > 1 else None
-    timezone = parts[2] if len(parts) > 2 and "/" not in parts[2] else None
-    data_start = 3 if timezone is not None else 2
+    data_start = 2
+    timezone, data_start = _extract_timezone(parts, data_start)
     header_tokens = _split_slash_tokens(" ".join(parts[data_start:])) if len(parts) > data_start else []
 
     parameter: str | None = None
@@ -129,9 +130,10 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
     sequence = 0
     while i < len(lines):
         line = lines[i]
-        if not _is_e_continuation_line(line):
+        continuation_match = _E_CONTINUATION_RE.match(line)
+        if continuation_match is None:
             break
-        _, _, payload = line.partition(" ")
+        payload = line[continuation_match.end() :].strip()
         values = _split_slash_tokens(payload)
         if parameter:
             for value in values:
@@ -163,7 +165,7 @@ def _parse_dot_b(lines: list[str], start: int) -> tuple[list[_Measurement], int]
     main, _, tail = payload.partition("/")
     parts = main.strip().split()
     date_token = parts[1] if len(parts) > 1 else None
-    timezone = parts[2] if len(parts) > 2 and "/" not in parts[2] else None
+    timezone, _ = _extract_timezone(parts, 2)
     header_tokens = _split_slash_tokens(tail)
     parameters = [token for token in header_tokens if not token.startswith(_CONTROL_PREFIX)]
 
