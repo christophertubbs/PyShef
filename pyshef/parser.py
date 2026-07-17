@@ -11,7 +11,8 @@ _CONTROL_PREFIX = "D"
 _FORMAT_RE = re.compile(r"^\.(A|B|E)[A-Z0-9]*\b")
 # Matches parameter code tokens with optional trailing values ("PPH 1.25", "TAH 72").
 _CODE_VALUE_RE = re.compile(r"^([A-Z][A-Z0-9]{1,7})(?:\s+(.+))?$")
-_E_CONTINUATION_RE = re.compile(r"^\.E(\d+)\b")
+_ER_HEADER_RE = re.compile(r"^\.ER\b", re.IGNORECASE)
+_E_CONTINUATION_RE = re.compile(r"^\.E(\d+)\b", re.IGNORECASE)
 _TIMEZONE_RE = re.compile(r"^[A-Z]{1,3}$")
 
 
@@ -138,7 +139,7 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
     sequence = 0
     while i < len(lines):
         line = lines[i]
-        continuation_match = _E_CONTINUATION_RE.match(line.upper())
+        continuation_match = _E_CONTINUATION_RE.match(line)
         if continuation_match is None:
             break
         payload = line[continuation_match.end():].strip()
@@ -250,7 +251,7 @@ def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
             rows.extend(_parse_dot_a_or_e(line, "A"))
             i += 1
         elif fmt == "E":
-            if len(line) >= 3 and line[0] == "." and line[1].upper() == "E" and line[2].upper() == "R":
+            if _ER_HEADER_RE.match(line):
                 e_rows, next_i = _parse_dot_er_block(normalized, i)
                 rows.extend(e_rows)
                 i = next_i
