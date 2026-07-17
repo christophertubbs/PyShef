@@ -7,7 +7,9 @@ from typing import Iterable
 import pandas as pd
 
 _CONTROL_PREFIXES = ("D",)
+# Matches leading SHEF message format markers like ".A", ".B", ".BR", and ".E".
 _FORMAT_RE = re.compile(r"^\.(A|B|E)[A-Z0-9]*\b")
+# Matches parameter code tokens with optional trailing values ("PPH 1.25", "TAH 72").
 _CODE_VALUE_RE = re.compile(r"^([A-Z][A-Z0-9]{1,7})(?:\s+(.+))?$")
 
 
@@ -36,6 +38,12 @@ def _extract_code_value(token: str) -> tuple[str | None, str | None]:
 
 
 def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
+    """Parse a single `.A` or `.E` line into measurements.
+
+    `.A` messages produce one row per explicit parameter/value pair.
+    `.E` messages also support trailing value-only tokens after a parameter
+    token and emit a zero-based `sequence` index for each extracted value.
+    """
     prefix, _, payload = line.partition(" ")
     parts = payload.strip().split()
     station = parts[0] if parts else None
@@ -92,6 +100,12 @@ def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
 
 
 def _parse_dot_b(lines: list[str], start: int) -> tuple[list[_Measurement], int]:
+    """Parse a `.B` block from `start` until `.END`.
+
+    Header parameter tokens are used for positional mapping in body lines.
+    Body lines that include explicit `CODE value` tokens use those directly.
+    Returns parsed measurements and the next unread line index.
+    """
     header = lines[start]
     _, _, payload = header.partition(" ")
     main, _, tail = payload.partition("/")
@@ -149,6 +163,12 @@ def _parse_dot_b(lines: list[str], start: int) -> tuple[list[_Measurement], int]
 
 
 def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
+    """Parse SHEF text lines into a pandas DataFrame.
+
+    Supports `.A`, `.B` (until `.END`), and `.E` records.
+    Returns columns: `format`, `station`, `date_token`, `timezone`,
+    `parameter`, `value`, and `sequence`.
+    """
     rows: list[_Measurement] = []
     normalized = [line.strip() for line in lines if line.strip()]
 
@@ -189,4 +209,9 @@ def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
 
 
 def parse_shef(text: str) -> pd.DataFrame:
+    """Parse a SHEF text blob into a pandas DataFrame.
+
+    Example input includes `.A`, `.B`/`.END`, and `.E` records in one text
+    string. Output schema matches `parse_shef_lines`.
+    """
     return parse_shef_lines(text.splitlines())
