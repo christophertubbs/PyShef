@@ -33,3 +33,26 @@ def test_parse_dot_e_series_values_track_sequence():
     assert list(frame["parameter"]) == ["PPH", "PPH", "PPH"]
     assert list(frame["value"]) == ["0.1", "0.2", "0.3"]
     assert list(frame["sequence"]) == [0, 1, 2]
+
+
+def test_parse_dot_er_with_e_numbered_continuations():
+    text = "\n".join(
+        [
+            "000",
+            "FGUS55 KSTR 171541",
+            ".ER BCTU1 0717 Z DH13/DC07171540/QRIFEZZ/DIH+01/",
+            ".E1  0.026 / 0.026 / 0.026 / 0.026 /",
+            ".E2  0.026 / 0.026 / 0.026 / 0.026 /",
+            ".ER DELU1 0717 Z DH13/DC07171540/QTIFEZZ/DIH+01/",
+            ".E1  0.000 / 0.000 / 0.000 / 0.000 /",
+            ".E2  0.000 / 0.000 / 0.000 / 0.000 /",
+            "$$",
+        ]
+    )
+    frame = parse_shef(text)
+    assert len(frame) == 16
+    assert set(frame["station"]) == {"BCTU1", "DELU1"}
+    assert set(frame.loc[frame["station"] == "BCTU1", "parameter"]) == {"QRIFEZZ"}
+    assert set(frame.loc[frame["station"] == "DELU1", "parameter"]) == {"QTIFEZZ"}
+    assert list(frame.loc[frame["station"] == "BCTU1", "sequence"]) == list(range(8))
+    assert list(frame.loc[frame["station"] == "DELU1", "sequence"]) == list(range(8))

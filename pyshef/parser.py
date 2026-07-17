@@ -11,6 +11,7 @@ _CONTROL_PREFIX = "D"
 _FORMAT_RE = re.compile(r"^\.(A|B|E)[A-Z0-9]*\b")
 # Matches parameter code tokens with optional trailing values ("PPH 1.25", "TAH 72").
 _CODE_VALUE_RE = re.compile(r"^([A-Z][A-Z0-9]{1,7})(?:\s+(.+))?$")
+_E_CONTINUATION_RE = re.compile(r"^\.E\d+\b", re.IGNORECASE)
 
 
 @dataclass
@@ -98,6 +99,51 @@ def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
             if fmt == "E":
                 sequence += 1
     return out
+
+
+def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement], int]:
+    """Parse an `.ER` header with following `.E<number>` continuation lines."""
+    header = lines[start]
+    _, _, payload = header.partition(" ")
+    parts = payload.strip().split()
+    station = parts[0] if parts else None
+    date_token = parts[1] if len(parts) > 1 else None
+    timezone = parts[2] if len(parts) > 2 and "/" not in parts[2] else None
+    data_start = 3 if timezone is not None else 2
+    header_tokens = _split_slash_tokens(" ".join(parts[data_start:]))
+
+    parameter: str | None = None
+    for token in header_tokens:
+        code, _ = _extract_code_value(token)
+        if code and not code.startswith(_CONTROL_PREFIX):
+            parameter = code
+            break
+
+    out: list[_Measurement] = []
+    i = start + 1
+    sequence = 0
+    while i < len(lines):
+        line = lines[i]
+        if not _E_CONTINUATION_RE.match(line):
+            break
+        _, _, payload = line.partition(" ")
+        values = _split_slash_tokens(payload)
+        if parameter:
+            for value in values:
+                out.append(
+                    _Measurement(
+                        format="E",
+                        station=station,
+                        date_token=date_token,
+                        timezone=timezone,
+                        parameter=parameter,
+                        value=value,
+                        sequence=sequence,
+                    )
+                )
+                sequence += 1
+        i += 1
+    return out, i
 
 
 def _parse_dot_b(lines: list[str], start: int) -> tuple[list[_Measurement], int]:
@@ -189,8 +235,13 @@ def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
             rows.extend(_parse_dot_a_or_e(line, "A"))
             i += 1
         elif fmt == "E":
-            rows.extend(_parse_dot_a_or_e(line, "E"))
-            i += 1
+            if line.upper().startswith(".ER"):
+                e_rows, next_i = _parse_dot_er_block(normalized, i)
+                rows.extend(e_rows)
+                i = next_i
+            else:
+                rows.extend(_parse_dot_a_or_e(line, "E"))
+                i += 1
         else:
             b_rows, next_i = _parse_dot_b(normalized, i)
             rows.extend(b_rows)
