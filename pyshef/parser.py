@@ -106,7 +106,13 @@ def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
 
 
 def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement], int]:
-    """Parse an `.ER` header with following `.E<number>` continuation lines."""
+    """Parse an `.ER` header with `.E<number>` continuation lines.
+
+    Returns `(measurements, next_line_index)`, where `measurements` is a list
+    of parsed `.E` rows and `next_line_index` is the first unconsumed line.
+    If no non-control parameter is found in the `.ER` header, continuation
+    values are skipped.
+    """
     header = lines[start]
     _, _, payload = header.partition(" ")
     parts = payload.strip().split()
@@ -242,7 +248,7 @@ def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
             rows.extend(_parse_dot_a_or_e(line, "A"))
             i += 1
         elif fmt == "E":
-            if line.startswith((".ER", ".er")):
+            if line[:3].upper() == ".ER":
                 e_rows, next_i = _parse_dot_er_block(normalized, i)
                 rows.extend(e_rows)
                 i = next_i
