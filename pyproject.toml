@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyshef"
+version = "0.1.0"
+description = "Parse SHEF .A, .B, and .E messages into pandas DataFrames"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+dependencies = [
+  "pandas>=2.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["pyshef*"]
