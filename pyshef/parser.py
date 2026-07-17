@@ -33,7 +33,8 @@ def _extract_code_value(token: str) -> tuple[str | None, str | None]:
     if not match:
         return None, token
     code = match.group(1)
-    value = match.group(2).strip() if match.group(2) else None
+    raw_value = match.group(2)
+    value = raw_value.strip() if raw_value is not None else None
     return code, value
 
 
@@ -111,7 +112,7 @@ def _parse_dot_b(lines: list[str], start: int) -> tuple[list[_Measurement], int]
     main, _, tail = payload.partition("/")
     parts = main.strip().split()
     date_token = parts[1] if len(parts) > 1 else None
-    timezone = parts[2] if len(parts) > 2 else None
+    timezone = parts[2] if len(parts) > 2 and "/" not in parts[2] else None
     header_tokens = _split_slash_tokens(tail)
     parameters = [token for token in header_tokens if not token.startswith(_CONTROL_PREFIX)]
 
@@ -168,6 +169,7 @@ def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
     Supports `.A`, `.B` (until `.END`), and `.E` records.
     Returns columns: `format`, `station`, `date_token`, `timezone`,
     `parameter`, `value`, and `sequence`.
+    `value` is preserved as the raw token string from SHEF data.
     """
     rows: list[_Measurement] = []
     normalized = [line.strip() for line in lines if line.strip()]

@@ -7,6 +7,7 @@ def test_parse_dot_a_single_message():
     assert len(frame) == 2
     assert list(frame["parameter"]) == ["PPH", "TAH"]
     assert list(frame["value"]) == ["1.25", "72"]
+    assert all(isinstance(v, str) for v in frame["value"])
     assert set(frame["format"]) == {"A"}
 
 
