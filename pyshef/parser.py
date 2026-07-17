@@ -6,7 +6,7 @@ from typing import Iterable
 
 import pandas as pd
 
-_CONTROL_PREFIXES = ("D",)
+_CONTROL_PREFIX = "D"
 # Matches leading SHEF message format markers like ".A", ".B", ".BR", and ".E".
 _FORMAT_RE = re.compile(r"^\.(A|B|E)[A-Z0-9]*\b")
 # Matches parameter code tokens with optional trailing values ("PPH 1.25", "TAH 72").
@@ -61,7 +61,7 @@ def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
     sequence = 0
     for token in tokens:
         code, value = _extract_code_value(token)
-        if code and code.startswith(_CONTROL_PREFIXES):
+        if code and code.startswith(_CONTROL_PREFIX):
             continue
         if code and value is None:
             current_parameter = code
@@ -113,7 +113,7 @@ def _parse_dot_b(lines: list[str], start: int) -> tuple[list[_Measurement], int]
     date_token = parts[1] if len(parts) > 1 else None
     timezone = parts[2] if len(parts) > 2 else None
     header_tokens = _split_slash_tokens(tail)
-    parameters = [token for token in header_tokens if not token.startswith(_CONTROL_PREFIXES)]
+    parameters = [token for token in header_tokens if not token.startswith(_CONTROL_PREFIX)]
 
     out: list[_Measurement] = []
     i = start + 1
@@ -132,7 +132,7 @@ def _parse_dot_b(lines: list[str], start: int) -> tuple[list[_Measurement], int]
         explicit_rows = 0
         for token in values:
             code, value = _extract_code_value(token)
-            if code and value is not None and not code.startswith(_CONTROL_PREFIXES):
+            if code and value is not None and not code.startswith(_CONTROL_PREFIX):
                 out.append(
                     _Measurement(
                         format="B",
