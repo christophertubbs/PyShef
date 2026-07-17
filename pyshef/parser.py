@@ -11,7 +11,7 @@ _CONTROL_PREFIX = "D"
 _FORMAT_RE = re.compile(r"^\.(A|B|E)[A-Z0-9]*\b")
 # Matches parameter code tokens with optional trailing values ("PPH 1.25", "TAH 72").
 _CODE_VALUE_RE = re.compile(r"^([A-Z][A-Z0-9]{1,7})(?:\s+(.+))?$")
-_E_CONTINUATION_RE = re.compile(r"^\.[Ee](\d+)\b")
+_E_CONTINUATION_RE = re.compile(r"^\.E(\d+)\b")
 _TIMEZONE_RE = re.compile(r"^[A-Z]{1,3}$")
 
 
@@ -110,8 +110,9 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
 
     Returns `(measurements, next_line_index)`, where `measurements` is a list
     of parsed `.E` rows and `next_line_index` is the first unconsumed line.
-    If no non-control parameter is found in the `.ER` header, continuation
-    values are skipped.
+    If no non-control parameter (a code that does not begin with
+    `_CONTROL_PREFIX`) is found in the `.ER` header, continuation values are
+    skipped.
     """
     header = lines[start]
     _, _, payload = header.partition(" ")
@@ -136,10 +137,10 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
     sequence = 0
     while i < len(lines):
         line = lines[i]
-        continuation_match = _E_CONTINUATION_RE.match(line)
+        continuation_match = _E_CONTINUATION_RE.match(line.upper())
         if continuation_match is None:
             break
-        payload = line[continuation_match.end() :].strip()
+        payload = line[continuation_match.end():].strip()
         values = _split_slash_tokens(payload)
         if parameter:
             for value in values:
