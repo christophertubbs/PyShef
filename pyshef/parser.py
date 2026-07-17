@@ -110,11 +110,13 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
     date_token = parts[1] if len(parts) > 1 else None
     timezone = parts[2] if len(parts) > 2 and "/" not in parts[2] else None
     data_start = 3 if timezone is not None else 2
-    header_tokens = _split_slash_tokens(" ".join(parts[data_start:]))
+    header_tokens = _split_slash_tokens(" ".join(parts[data_start:])) if len(parts) > data_start else []
 
     parameter: str | None = None
     for token in header_tokens:
-        code, _ = _extract_code_value(token)
+        code, value = _extract_code_value(token)
+        if value is not None:
+            continue
         if code and not code.startswith(_CONTROL_PREFIX):
             parameter = code
             break
@@ -235,7 +237,7 @@ def parse_shef_lines(lines: Iterable[str]) -> pd.DataFrame:
             rows.extend(_parse_dot_a_or_e(line, "A"))
             i += 1
         elif fmt == "E":
-            if line.upper().startswith(".ER"):
+            if line.startswith((".ER", ".er")):
                 e_rows, next_i = _parse_dot_er_block(normalized, i)
                 rows.extend(e_rows)
                 i = next_i
