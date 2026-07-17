@@ -11,7 +11,6 @@ _CONTROL_PREFIX = "D"
 _FORMAT_RE = re.compile(r"^\.(A|B|E)[A-Z0-9]*\b")
 # Matches parameter code tokens with optional trailing values ("PPH 1.25", "TAH 72").
 _CODE_VALUE_RE = re.compile(r"^([A-Z][A-Z0-9]{1,7})(?:\s+(.+))?$")
-_E_CONTINUATION_RE = re.compile(r"^\.E\d+\b", re.IGNORECASE)
 
 
 @dataclass
@@ -37,6 +36,10 @@ def _extract_code_value(token: str) -> tuple[str | None, str | None]:
     raw_value = match.group(2)
     value = raw_value.strip() if raw_value is not None else None
     return code, value
+
+
+def _is_e_continuation_line(line: str) -> bool:
+    return len(line) > 2 and line[0] == "." and line[1].upper() == "E" and line[2].isdigit()
 
 
 def _parse_dot_a_or_e(line: str, fmt: str) -> list[_Measurement]:
@@ -126,7 +129,7 @@ def _parse_dot_er_block(lines: list[str], start: int) -> tuple[list[_Measurement
     sequence = 0
     while i < len(lines):
         line = lines[i]
-        if not _E_CONTINUATION_RE.match(line):
+        if not _is_e_continuation_line(line):
             break
         _, _, payload = line.partition(" ")
         values = _split_slash_tokens(payload)
